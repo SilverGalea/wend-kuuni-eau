@@ -24,9 +24,8 @@ const HomeScreen = ({ navigation }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
 
-  // Hooks pour styles dynamiques
   const { width } = useWindowDimensions();
-  const colorScheme = Appearance.getColorScheme(); // 'light' | 'dark'
+  const colorScheme = Appearance.getColorScheme();
 
   useEffect(() => {
     loadData();
@@ -47,7 +46,6 @@ const HomeScreen = ({ navigation }) => {
         const loc = await Location.getCurrentPositionAsync({});
         setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       } else {
-        // permission refusée : pas bloquant mais on le note
         setUserLocation(null);
       }
     } catch (e) {
@@ -92,13 +90,18 @@ const HomeScreen = ({ navigation }) => {
     setActiveFilter(filter);
   };
 
-  // --- Styles dynamiques selon état, thème et largeur écran ---
-  const dynamicStyles = getDynamicStyles({ activeFilter, hasPoints: filteredPoints.length > 0, userLocation, width, colorScheme });
+  const dynamicStyles = getDynamicStyles({ 
+    activeFilter, 
+    hasPoints: filteredPoints.length > 0, 
+    userLocation, 
+    width, 
+    colorScheme 
+  });
 
   if (loading) {
     return (
       <View style={[styles.centerContainer, dynamicStyles.centerContainer]}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#60A5FA' : '#3B82F6'} />
         <Text style={[styles.loadingText, dynamicStyles.loadingText]}>Chargement...</Text>
       </View>
     );
@@ -106,22 +109,35 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.container, dynamicStyles.container]}>
-      {/* Header */}
       <View style={[styles.header, dynamicStyles.header]}>
         <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>Points d'eau</Text>
 
-        {/* Barre de filtres (exemples de boutons) */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
           {['all', 'nearby', 'cheap', 'functional'].map((f) => {
             const active = f === activeFilter;
+            const filterLabels = {
+              all: 'Tous',
+              nearby: 'Proximité',
+              cheap: 'Prix',
+              functional: 'Fonctionnel'
+            };
+            
             return (
               <TouchableOpacity
                 key={f}
                 onPress={() => applyFilter(waterPoints, f)}
-                style={[styles.filterButton, dynamicStyles.filterButton, active && dynamicStyles.filterButtonActive]}
+                style={[
+                  styles.filterButton, 
+                  dynamicStyles.filterButton, 
+                  active && dynamicStyles.filterButtonActive
+                ]}
               >
-                <Text style={[styles.filterButtonText, dynamicStyles.filterButtonText, active && dynamicStyles.filterButtonTextActive]}>
-                  {f === 'all' ? 'Tous' : f.charAt(0).toUpperCase() + f.slice(1)}
+                <Text style={[
+                  styles.filterButtonText, 
+                  dynamicStyles.filterButtonText, 
+                  active && dynamicStyles.filterButtonTextActive
+                ]}>
+                  {filterLabels[f]}
                 </Text>
               </TouchableOpacity>
             );
@@ -129,19 +145,21 @@ const HomeScreen = ({ navigation }) => {
         </ScrollView>
       </View>
 
-      {/* Liste ou message vide */}
       {filteredPoints.length === 0 ? (
         <View style={[styles.emptyContainer, dynamicStyles.emptyContainer]}>
-          <Text style={[styles.emptyText, dynamicStyles.emptyText]}>Aucun point d'eau trouvé.</Text>
-          <Text style={[styles.hintText, dynamicStyles.hintText]}>Appuie sur + pour en ajouter.</Text>
+          <Text style={[styles.emptyText, dynamicStyles.emptyText]}>
+            Aucun point d'eau trouvé.
+          </Text>
+          <Text style={[styles.hintText, dynamicStyles.hintText]}>
+            Appuie sur + pour en ajouter.
+          </Text>
         </View>
       ) : (
         <FlatList
           data={filteredPoints}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            // Exemple d'application : si le point est < 200m on le marque comme "proche"
-            const isNear = userLocation ? calculateDistance(item.location, userLocation) <= 0.2 /*km*/ : false;
+            const isNear = userLocation ? calculateDistance(item.location, userLocation) <= 0.2 : false;
             return (
               <WaterPointItem
                 waterPoint={item}
@@ -152,166 +170,211 @@ const HomeScreen = ({ navigation }) => {
               />
             );
           }}
+          contentContainerStyle={styles.listContent}
         />
       )}
 
-      {/* Bouton flottant dynamique */}
       <TouchableOpacity
         style={[styles.addButton, dynamicStyles.addButton]}
         onPress={() => navigation.navigate('AddWaterPoint', { userLocation })}
       >
-        <Text style={[styles.addButtonText, dynamicStyles.addButtonText]}>+ Ajouter un point d'eau</Text>
+        <Text style={[styles.addButtonText, dynamicStyles.addButtonText]}>
+          + Ajouter un point d'eau
+        </Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-// Fonction qui retourne un objet de styles dynamiques
-function getDynamicStyles({ activeFilter, hasPoints, userLocation, width, colorScheme }) {
-  // Couleurs selon thème
-  const dark = colorScheme === 'dark';
-  const colors = {
-    background: dark ? '#0b0f14' : '#ffffff',
-    surface: dark ? '#0f1720' : '#f8fafc',
-    primary: '#2196F3',
-    nearAccent: '#4CAF50',
-    text: dark ? '#e6eef6' : '#0b2447',
-    muted: dark ? '#93A1B0' : '#6b7280',
-  };
-
-  // Taille responsive
-  const base = width >= 420 ? 18 : 16;
-  const headerHeight = width >= 420 ? 120 : 100;
-
-  // Couleur de header selon filtre actif
-  const headerBackgroundMap = {
-    all: colors.primary,
-    nearby: colors.nearAccent,
-    cheap: '#FFB300',
-    functional: '#7C4DFF',
-  };
-  const headerBg = headerBackgroundMap[activeFilter] || colors.primary;
-
-  return {
-    container: {
-      backgroundColor: colors.background,
-    },
-    centerContainer: {
-      backgroundColor: colors.background,
-    },
-    loadingText: {
-      color: colors.text,
-      marginTop: 12,
-    },
-    header: {
-      backgroundColor: headerBg,
-      height: headerHeight,
-      paddingHorizontal: 14,
-      paddingTop: 18,
-      borderBottomLeftRadius: 18,
-      borderBottomRightRadius: 18,
-      shadowColor: '#000',
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-      elevation: 4,
-    },
-    headerTitle: {
-      color: '#fff',
-      fontSize: base + 6,
-      fontWeight: '700',
-      marginBottom: 10,
-    },
-    filterButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      marginRight: 8,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-    },
-    filterButtonActive: {
-      backgroundColor: 'rgba(255,255,255,0.28)',
-      transform: [{ scale: 1.03 }],
-    },
-    filterButtonText: {
-      color: '#fff',
-      fontSize: base - 2,
-    },
-    filterButtonTextActive: {
-      fontWeight: '700',
-    },
-    emptyContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    },
-    emptyText: {
-      fontSize: base + 2,
-      color: colors.muted,
-      marginBottom: 8,
-    },
-    hintText: {
-      color: colors.muted,
-      fontSize: base - 2,
-    },
-    addButton: {
-      position: 'absolute',
-      right: 16,
-      bottom: 26,
-      backgroundColor: hasPoints ? '#ff6b00' : '#00aaff',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 28,
-      shadowColor: '#000',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-      elevation: 6,
-    },
-    addButtonText: {
-      color: '#fff',
-      fontWeight: '700',
-      fontSize: base,
-    },
-    nearItemOverride: {
-      borderLeftWidth: 4,
-      borderLeftColor: colors.nearAccent,
-      paddingLeft: 10,
-    },
-  };
-}
-
+// ============================================================================
+// STATIC STYLES
+// ============================================================================
 const styles = StyleSheet.create({
+  // Container Styles
   container: {
     flex: 1,
+    backgroundColor: '#F3F4F6',
   },
   centerContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
   },
-  loadingText: {
-    marginTop: 8,
-  },
-  header: {
-    // propriétés de base, overridées par dynamicStyles.header
-  },
-  headerTitle: {},
-  filterScroll: {
-    marginTop: 6,
-  },
-  filterButton: {},
-  filterButtonText: {},
   emptyContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  emptyText: {},
+
+  // Header Styles
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 48,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+
+  // Filter Styles
+  filterScroll: {
+    maxHeight: 50,
+  },
+  filterButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+
+  // List Styles
+  listContent: {
+    paddingBottom: 100,
+  },
+
+  // Empty State Styles
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   hintText: {
-    marginTop: 6,
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
+
+  // Loading Styles
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+
+  // Add Button Styles
   addButton: {
-    // styles de base, overridés par dynamicStyles.addButton
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    left: 16,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  addButtonText: {},
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });
+
+// ============================================================================
+// DYNAMIC STYLES FUNCTION
+// ============================================================================
+const getDynamicStyles = ({ activeFilter, hasPoints, userLocation, width, colorScheme }) => {
+  const isDark = colorScheme === 'dark';
+  const isTablet = width >= 768;
+
+  return StyleSheet.create({
+    // Container Styles
+    container: {
+      backgroundColor: isDark ? '#111827' : '#F3F4F6',
+    },
+    centerContainer: {
+      backgroundColor: isDark ? '#111827' : '#F3F4F6',
+    },
+    emptyContainer: {
+      backgroundColor: isDark ? '#1F2937' : 'transparent',
+      borderRadius: isTablet ? 16 : 0,
+      marginHorizontal: isTablet ? 32 : 0,
+    },
+
+    // Header Styles
+    header: {
+      backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+      borderBottomColor: isDark ? '#374151' : '#E5E7EB',
+      paddingHorizontal: isTablet ? 32 : 16,
+    },
+    headerTitle: {
+      fontSize: isTablet ? 32 : 28,
+      color: isDark ? '#F9FAFB' : '#111827',
+    },
+
+    // Filter Styles
+    filterButton: {
+      backgroundColor: isDark ? '#374151' : '#F3F4F6',
+      borderColor: isDark ? '#4B5563' : '#E5E7EB',
+    },
+    filterButtonActive: {
+      backgroundColor: isDark ? '#3B82F6' : '#3B82F6',
+      borderColor: isDark ? '#3B82F6' : '#3B82F6',
+    },
+    filterButtonText: {
+      color: isDark ? '#D1D5DB' : '#6B7280',
+    },
+    filterButtonTextActive: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+
+    // Empty State Styles
+    emptyText: {
+      color: isDark ? '#9CA3AF' : '#6B7280',
+      fontSize: isTablet ? 20 : 18,
+    },
+    hintText: {
+      color: isDark ? '#6B7280' : '#9CA3AF',
+      fontSize: isTablet ? 16 : 14,
+    },
+
+    // Loading Styles
+    loadingText: {
+      color: isDark ? '#9CA3AF' : '#6B7280',
+    },
+
+    // Add Button Styles
+    addButton: {
+      backgroundColor: isDark ? '#2563EB' : '#3B82F6',
+      bottom: isTablet ? 32 : 24,
+      left: isTablet ? 32 : 16,
+      right: isTablet ? 32 : 16,
+    },
+    addButtonText: {
+      fontSize: isTablet ? 18 : 16,
+    },
+
+    // Near Item Override (for WaterPointItem)
+    nearItemOverride: {
+      borderColor: '#10B981',
+      borderWidth: 2,
+      backgroundColor: isDark ? '#064E3B' : '#D1FAE5',
+    },
+  });
+};
 
 export default HomeScreen;
